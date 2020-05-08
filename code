@@ -1,4 +1,7 @@
-1. package main
+1.
+现有整型数组 a 、整型数组 b、以及整型v。请使⽤指定编程语⾔编写函数，判 断是否可以从 a 中选择⼀个数，b 中选择⼀个数，⼆者相加等于 v，如可以返回 true ，否则返回 false 
+
+package main
 
 import (
 	"fmt"
@@ -27,7 +30,10 @@ func check(a, b []int, target int) bool {
 	}
 	return false
 }
-2. package main
+2. 
+现要求游戏玩家的⽤户名是 user 后加上不重复且随机的正整数，请参考 PostgreSQL 中 pseudo_encrypt() 的原理，使⽤指定编程语⾔，实现⼀个⾼ 效的⽤户名⽣成算法
+
+package main
 
 import (
 	"github.com/satori/go.uuid"
@@ -62,4 +68,91 @@ func genNum(l int) int64 {
 	return result
 }
 
-4. 
+4. 请设计系统和协议，使⽤以上算法，实现⼿机⽤户的注册和登录，要求能够实现 ⽤户名与设备的绑定，并应对 10万⽤户/⼩时 的注册和登录压⼒，系统应具有横 向扩展能⼒。 
+
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"strings"
+	"github.com/satori/go.uuid"
+	"strconv"
+)
+
+type (
+	User struct {
+		Name     string `json:"name" binding:"-"`
+		Password string `json:"password" binding:"required"`
+		Phone    string `json:"phone" binding:"required"`
+		Idfa     string `json:"idfa" binding:"required"`
+	}
+)
+
+var (
+	//k:phone,v:user
+	db = make(map[string]*User, 1024)
+)
+
+func main() {
+	r := gin.Default()
+	r.POST("/login", func(c *gin.Context) {
+		var u User
+		if err := c.ShouldBindJSON(&u); err == nil {
+			if u2, ok := db[u.Phone]; !ok {
+				c.JSON(http.StatusOK, gin.H{"status": 201, "msg": u.Phone + " is unregistered!"})
+			} else {
+				if u2.Password == u.Password {
+					u2.Password = ""
+					c.JSON(http.StatusOK, gin.H{"status": 200, "msg": u2})
+				}else{
+					c.JSON(http.StatusOK, gin.H{"status": 203, "msg": "auth fail!"})
+
+				}
+			}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"status": 202, "msg": err.Error()})
+
+		}
+	})
+	r.POST("/registered", func(c *gin.Context) {
+		var u User
+		if err := c.ShouldBindJSON(&u); err == nil {
+			if _, ok := db[u.Phone]; ok {
+				c.JSON(http.StatusOK, gin.H{"status": 201, "msg": "phone number [" + u.Phone + "] exists!"})
+			} else {
+				u.Name = "user" + genNum(8)
+				db[u.Phone] = &u
+				c.JSON(http.StatusOK, gin.H{"status": 200, "msg": "registered ok!"})
+			}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"status": 202, "msg": err.Error()})
+		}
+
+	})
+	r.Run()
+}
+
+func genNum(l int) string {
+	u1 := uuid.Must(uuid.NewV4())
+	s1 := strings.Replace(u1.String(), "-", "", -1)
+	var ret string
+	for _, s := range s1 {
+		if 65 <= s || s <= 122 {
+			ret = ret + strconv.Itoa(int(s))
+		} else {
+			ret = ret + string(s)
+		}
+		if len(ret) == l {
+			break
+		} else if len(ret) > l {
+			ret = ret[:l]
+		}
+	}
+
+	return ret
+}
+
+补充：在注册登录系统前使用nginx做反向代理，一台ng对应多个登录服务，可横向扩展
+
+
